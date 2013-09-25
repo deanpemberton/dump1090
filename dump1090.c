@@ -2358,6 +2358,7 @@ void useModesMessage(struct modesMessage *mm) {
           || (Modes.mysql)                // or if mysql is enabled
           || (Modes.mode_ac) ) {          // or if mode A/C decoding is enabled
            struct aircraft *a = interactiveReceiveData(mm);
+           if (Modes.mysql)                  {modesFeedMySQL(mm, a);}
         }
 
         // In non-interactive non-quiet mode, display messages on standard output
@@ -2369,7 +2370,6 @@ void useModesMessage(struct modesMessage *mm) {
         if (Modes.stat_sbs_connections)   {modesSendSBSOutput(mm);}
         if (Modes.stat_beast_connections) {modesSendBeastOutput(mm);}
         if (Modes.stat_raw_connections)   {modesSendRawOutput(mm);}
-        if (Modes.mysql)                  {modesFeedMySQL(mm, a);}
     }
 }
 
