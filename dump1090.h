@@ -56,6 +56,7 @@
     #include <fcntl.h>
     #include <ctype.h>
     #include <sys/stat.h>
+    #include <mysql/mysql.h>
     #include "rtl-sdr.h"
     #include "anet.h"
 #else
@@ -265,6 +266,7 @@ struct {                             // Internal state
     int   mode_ac;                   // Enable decoding of SSR Modes A & C
     int   debug;                     // Debugging mode
     int   net;                       // Enable networking
+    int   mysql;                     // Enable mysql database
     int   net_only;                  // Enable just networking
     int   net_output_sbs_port;       // SBS output TCP port
     int   net_output_raw_size;       // Minimum Size of the output raw data
@@ -390,6 +392,8 @@ void modesSendRawOutput   (struct modesMessage *mm);
 void modesSendBeastOutput (struct modesMessage *mm);
 void modesSendSBSOutput   (struct modesMessage *mm);
 void useModesMessage      (struct modesMessage *mm);
+void modesFeedMySQL       (struct modesMessage *mm, struct aircraft *a);
+
 
 int  fixBitErrors         (unsigned char *msg, int bits, int maxfix, char *fixedbits);
 
