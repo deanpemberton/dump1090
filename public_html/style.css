@@ -9,7 +9,10 @@ div#sidebar_container { float: left; width: 410px; margin-left: -410px; height: 
 
 div#SpecialSquawkWarning { position: absolute; bottom: 25px; right: 430px; border: 2px solid red;
     background-color: #FFFFA3; opacity: 0.75; filter:alpha(opacity=75); padding: 5px;
-    display: none; text-align: center; }
+    display: none; text-align: center; z-index: 99000; }
+
+div#METAR { position: absolute;cursor: move; padding: 5px; display: none; text-align: left;
+    z-index: 90000; }
 
 table#optionsTabs { width: 100%; font-size: small; font-family: monospace; background-color: #ddd;
     border: 1px; border-color: #000000;}

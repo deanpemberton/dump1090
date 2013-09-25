@@ -14,13 +14,14 @@ var planeObject = {
 	flight		: null,
 	squawk		: null,
 	icao		: null,
+	reg         : null,
 	is_selected	: false,	
 
 	// Data packet numbers
 	messages	: null,
 	seen		: null,
 
-	// Vaild...
+	// Valid...
 	vPosition	: false,
 	vTrack		: false,
 
@@ -90,7 +91,8 @@ var planeObject = {
                     "-2.858644 -0.145909,-5.208974 -0.209316,-5.222958 -0.06341,-0.01399 -0.974464," +
                     "-0.0493 -2.024551,-0.07845 L 23.247235,38.61921 18.831373,39.8906 C 4.9432155," +
                     "43.88916 4.2929558,44.057819 3.4954426,43.86823 2.7487826,43.690732 2.2007966," +
-                    "42.916622 1.9565564,41.694305 z"
+                    "42.916622 1.9565564,41.694305 z",
+                diamondData : "M 20 0 L 40 26 L 20 52 L 0 26 z"
             };
 
 			// If the squawk code is one of the international emergency codes,
@@ -110,7 +112,7 @@ var planeObject = {
 
 			return {
                 strokeWeight: (this.is_selected ? 2 : 1),
-                path:  "M 0,0 "+ baseSvg["planeData"],
+                path:  'M 0,0 ' + (this.vTrack ? baseSvg['planeData'] : baseSvg['diamondData']),
                 scale: 0.4,
                 fillColor: this.markerColor,
                 fillOpacity: 0.9,
@@ -134,15 +136,22 @@ var planeObject = {
 			// Update all of our data
 			this.updated	= new Date().getTime();
 			this.altitude	= data.altitude;
-			this.speed	= data.speed;
-			this.track	= data.track;
+			this.speed	    = data.speed;
+			this.track	    = data.track;
 			this.latitude	= data.lat;
 			this.longitude	= data.lon;
-			this.flight	= data.flight;
-			this.squawk	= data.squawk;
-			this.icao	= data.hex;
+			this.flight	    = data.flight;
+			this.squawk	    = data.squawk;
+			this.icao	    = data.hex;
 			this.messages	= data.messages;
-			this.seen	= data.seen;
+			this.seen	    = data.seen;
+			this.signal     = data.signal;
+			this.vTrack     = (parseInt(data.validtrack) ? true : false);
+			this.vPosition  = (parseInt(data.validposition) ? true : false);
+			this.vAltitude  = (parseInt(data.validaltitude) ? true : false);
+			if (data.reg && data.reg != '') {
+			    this.reg    = data.reg;
+			}
 
 			// If no packet in over 58 seconds, consider the plane reapable
 			// This way we can hold it, but not show it just in case the plane comes back
@@ -164,6 +173,9 @@ var planeObject = {
 				}
 			} else {
 				if (this.reapable == true) {
+				    if (SelectedPlane == this.icao) {
+					    selectPlaneByHex(this.icao);
+					}
 					console.log(this.icao + ' has come back into range before the reaper!');
 				}
 				this.reapable = false;
@@ -171,39 +183,54 @@ var planeObject = {
 
 			// Is the position valid?
 			if ((data.validposition == 1) && (this.reapable == false)) {
-				this.vPosition = true;
-
 				// Detech if the plane has moved
 				changeLat = false;
 				changeLon = false;
 				changeAlt = false;
-				if (oldlat != this.latitude) {
-					changeLat = true;
-				}
-				if (oldlon != this.longitude) {
-					changeLon = true;
-				}
-				if (oldalt != this.altitude) {
-					changeAlt = true;
-				}
+				
+				if (oldlat != this.latitude)  { changeLat = true; }
+				if (oldlon != this.longitude) { changeLon = true; }
+				if (oldalt != this.altitude)  { changeAlt = true; }
+				
 				// Right now we only care about lat/long, if alt is updated only, oh well
 				if ((changeLat == true) || (changeLon == true)) {
 					this.funcAddToTrack();
 					if (this.is_selected) {
 						this.line = this.funcUpdateLines();
 					}
-				}
-				this.marker = this.funcUpdateMarker();
-				PlanesOnMap++;
-			} else {
-				this.vPosition = false;
-			}
+					
+					if (AntennaDataCollect) {
+					    var maxDist = 750000;
+					    var siteLatLon  = new google.maps.LatLng(SiteLat, SiteLon);
+					    var endLatLon = new google.maps.LatLng(this.latitude, this.longitude);
+					    var dist = google.maps.geometry.spherical.computeDistanceBetween(siteLatLon,
+					            endLatLon);
+					    var bearing = google.maps.geometry.spherical.computeHeading(siteLatLon,
+					            endLatLon);
+            
+                        bearing = Math.round(bearing);
+                        if (bearing < 0) { bearing += 360; }
+                        
+                        if (!Metric) {
+                            dist    /= 1.852;
+                            maxDist /= 1.852;
+                        }
+                        
+                        dist = parseFloat((Math.round((dist)*10)/10).toFixed(1));
 
-			// Do we have a valid track for the plane?
-			if (data.validtrack == 1)
-				this.vTrack = true;
-			else
-				this.vTrack = false;
+                        if (!AntennaData[bearing] || typeof AntennaData[bearing] === 'undefined' ||
+                           (dist > AntennaData[bearing] && dist < maxDist)) {
+                            AntennaData[bearing] = dist;
+                            localStorage.setObject('AntennaData', AntennaData);
+                            if (AntennaDataShow) {
+                                drawAntennaData(siteLatLon);
+                            }
+                        }
+		            }
+	            }
+	            this.marker = this.funcUpdateMarker();
+	            PlanesOnMap++;
+            }
 		},
 
 	// Update our marker on the map
@@ -216,7 +243,7 @@ var planeObject = {
 					position: new google.maps.LatLng(this.latitude, this.longitude),
 					map: GoogleMap,
 					icon: this.funcGetIcon(),
-					visable: true,
+					visible: true,
 				});
 
 				// This is so we can match icao address
@@ -250,6 +277,7 @@ var planeObject = {
 					strokeWeight: 3,
 					map: GoogleMap,
 					path: this.trackline,
+					zIndex: 10
 				});
 			}
 			return this.line;

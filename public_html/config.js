@@ -5,6 +5,9 @@
 //
 // --------------------------------------------------------
 
+// -- JSON-feed -------------------------------------------
+CONST_JSON = '/dump1090/data.json'; // Default '/dump1090/data.json'
+
 // -- Output Settings -------------------------------------
 // Show metric values
 Metric = false; // true or false
@@ -29,5 +32,14 @@ SiteLon     = 9.0;
 
 SiteCircles = true; // true or false (Only shown if SiteShow is true)
 // In nautical miles or km (depending settings value 'Metric')
-SiteCirclesDistances = new Array(100,150,200);
+SiteCirclesDistances = new Array(5,10,50,100,150,200);
+
+// -- METAR data ------------------------------------------
+// ICAO codes separated with comma
+MetarIcaoCode = "EGLL,EGLC";
+
+// -- Antenna Data Collection -----------------------------
+AntennaDataCollect  = false;
+AntennaDataShow     = false;
+AntennaDataOpacity  = 0.3;
 

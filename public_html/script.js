@@ -5,7 +5,11 @@ var PlanesOnMap   = 0;
 var PlanesOnTable = 0;
 var PlanesToReap  = 0;
 var SelectedPlane = null;
-var SpecialSqawk  = false;
+var SpecialSquawk = false;
+var MetarICAO     = null;
+var MetarReset    = true;
+var AntennaData     = {};
+var AntennaDataPath = null;
 
 var iSortCol=-1;
 var bSortASC=true;
@@ -17,40 +21,49 @@ CenterLat = Number(localStorage['CenterLat']) || CONST_CENTERLAT;
 CenterLon = Number(localStorage['CenterLon']) || CONST_CENTERLON;
 ZoomLvl   = Number(localStorage['ZoomLvl']) || CONST_ZOOMLVL;
 
+// Set ajax data type. Datatype 'jsonp' is needed when using json from different port or server.
+// This way data type can be set from config.js or untracked[...].js files.
+if (typeof(ajaxDataType) === 'undefined') {
+    ajaxDataType = 'json';
+}
+
 function fetchData() {
-	$.getJSON('/dump1090/data.json', function(data) {
-		PlanesOnMap = 0
-		SpecialSquawk = false;
+    $.ajax({
+	    url: CONST_JSON,
+	    dataType: ajaxDataType,
+	    success: function(data) {
+		    PlanesOnMap = 0
+		    SpecialSquawk = false;
 		
-		// Loop through all the planes in the data packet
-		for (var j=0; j < data.length; j++) {
-			// Do we already have this plane object in Planes?
-			// If not make it.
-			if (Planes[data[j].hex]) {
-				var plane = Planes[data[j].hex];
-			} else {
-				var plane = jQuery.extend(true, {}, planeObject);
-			}
+		    // Loop through all the planes in the data packet
+		    for (var j=0; j < data.length; j++) {
+			    // Do we already have this plane object in Planes?
+			    // If not make it.
+			    if (Planes[data[j].hex]) {
+				    var plane = Planes[data[j].hex];
+			    } else {
+				    var plane = jQuery.extend(true, {}, planeObject);
+			    }
 			
-			/* For special squawk tests
-			if (data[j].hex == '48413x') {
-            	data[j].squawk = '7700';
-            } //*/
-            
-            // Set SpecialSquawk-value
-            if (data[j].squawk == '7500' || data[j].squawk == '7600' || data[j].squawk == '7700') {
-                SpecialSquawk = true;
-            }
+			    /* For special squawk tests *
+			    if (data[j].hex == 'xxxxxx') {
+                	data[j].squawk = '7101';
+                } //*/
+                
+                // Set SpecialSquawk-value
+                if (data[j].squawk == '7500' || data[j].squawk == '7600' || data[j].squawk == '7700') {
+                    SpecialSquawk = true;
+                }
 
-			// Call the function update
-			plane.funcUpdateData(data[j]);
+			    // Call the function update
+			    plane.funcUpdateData(data[j]);
 			
-			// Copy the plane into Planes
-			Planes[plane.icao] = plane;
-		}
-
-		PlanesOnTable = data.length;
-	});
+			    // Copy the plane into Planes
+			    Planes[plane.icao] = plane;
+		    }
+		    PlanesOnTable = data.length;
+	    }
+    });
 }
 
 // Initalizes the map and starts up our timers to call various functions
@@ -162,16 +175,19 @@ function initialize() {
     
     google.maps.event.addListener(GoogleMap, 'zoom_changed', function() {
         localStorage['ZoomLvl']  = GoogleMap.getZoom();
-    }); 
+    });
 	
 	// Add home marker if requested
 	if (SiteShow && (typeof SiteLat !==  'undefined' || typeof SiteLon !==  'undefined')) {
 	    var siteMarker  = new google.maps.LatLng(SiteLat, SiteLon);
-	    var markerImage = new google.maps.MarkerImage(
-	        'http://maps.google.com/mapfiles/kml/pal4/icon57.png',
-            new google.maps.Size(32, 32),   // Image size
-            new google.maps.Point(0, 0),    // Origin point of image
-            new google.maps.Point(16, 16)); // Position where marker should point 
+	    
+	    var markerImage = {
+	        url:    'http://maps.google.com/mapfiles/kml/pal4/icon57.png',
+            size:   new google.maps.Size(32, 32),   // Image size
+            origin: new google.maps.Point(0, 0),    // Origin point of image
+            anchor: new google.maps.Point(16, 16)   // Position where marker should point
+        };
+             
 	    var marker = new google.maps.Marker({
           position: siteMarker,
           map: GoogleMap,
@@ -185,13 +201,51 @@ function initialize() {
               drawCircle(marker, SiteCirclesDistances[i]); // in meters
             }
         }
+        
+        if (AntennaDataCollect) {
+            if (localStorage.getObject('AntennaData')) {
+                AntennaData = localStorage.getObject('AntennaData');
+            }
+        }
+        
+        if (AntennaDataShow) {
+            // Get AntennaData from localStorage
+            if (localStorage['AntennaData']) {AntennaData = localStorage.getObject('AntennaData');}
+            
+            // Load data from file
+            length = Object.size(AntennaData);
+            if (length < 270) {
+                jQuery.ajaxSetup({async:false});
+                $.get('/antennaBaseCoverage.txt',  function(data) {
+                    if (data.indexOf('Error') == -1) { // no errors
+                        localStorage['AntennaData'] = data;
+                    }
+                });
+                jQuery.ajaxSetup({async:true});
+            }
+            
+            if (localStorage['AntennaData']) {
+                AntennaData = localStorage.getObject('AntennaData');
+                drawAntennaData(siteMarker);
+            }
+        }
 	}
 	
-	// These will run after page is complitely loaded
-	$(window).load(function() {
-        $('#dialog-modal').css('display', 'inline'); // Show hidden settings-windows content
+	// Ui buttons setup
+	btnWidth = "100px";
+	$("#resetMap").button({icons: {primary: "ui-icon-arrowrefresh-1-w"}});
+	$("#resetMap").width(btnWidth);
+	$("#resetMap").css("margin-bottom", "3px");
+	$("#resetMap").button().focus(function() {
+      $(this).button("widget").removeClass("ui-state-focus");
     });
-
+	
+	$("#optionsModal").button({icons: {primary: "ui-icon-gear"}});
+	$("#optionsModal").width(btnWidth);
+    $("#optionsModal").button().focus(function() {
+      $(this).button("widget").removeClass("ui-state-focus");
+    });
+	
 	// Load up our options page
 	optionsInitalize();
 
@@ -206,6 +260,17 @@ function initialize() {
 		reaper();
 		extendedPulse();
 	}, 1000);
+	
+	// Refresh metar now and then only once every 5 minutes.
+	if (MetarIcaoCode && MetarIcaoCode != "") {
+	    getMetar();
+	    $("#METAR").on("drag", function(event, ui) {
+	        MetarDragged = true;
+	    });
+        window.setInterval(function() {
+            getMetar();
+        }, 300000);
+    }
 }
 
 // This looks for planes to reap out of the master Planes variable
@@ -268,7 +333,7 @@ function refreshSelected() {
 	}
 	html += '<td></tr>';
 	
-	if (selected) {
+	if (selected && selected.vAltitude) {
 	    if (Metric) {
         	html += '<tr><td>Altitude: ' + Math.round(selected.altitude / 3.2828) + ' m</td>';
         } else {
@@ -308,7 +373,15 @@ function refreshSelected() {
 	} else {
 	    html += 'n/a';
 	}
-	html += '</td><td>&nbsp;</td></tr>';
+
+	html += '</td><td>Reg: '
+	if (selected.reg && selected.reg != '') {
+	    html += '<a href="http://www.planespotters.net/Aviation_Photos/search.php?reg='+selected.reg +
+	        '&o=14" target="_blank">' + selected.reg + '</a>';
+	} else {
+	    html += 'n/a';
+	}
+	html += '</td></tr>';
 
 	html += '<tr><td colspan="' + columns + '" align="center">Lat/Long: ';
 	if (selected && selected.vPosition) {
@@ -318,16 +391,21 @@ function refreshSelected() {
 	    if (SiteShow) {
             var siteLatLon  = new google.maps.LatLng(SiteLat, SiteLon);
             var planeLatLon = new google.maps.LatLng(selected.latitude, selected.longitude);
-            var dist = google.maps.geometry.spherical.computeDistanceBetween (siteLatLon, planeLatLon);
+            var dist = google.maps.geometry.spherical.computeDistanceBetween(siteLatLon, planeLatLon);
+            var bearing = google.maps.geometry.spherical.computeHeading(siteLatLon, planeLatLon);
+            
+            bearing = Math.round(bearing);
+            if (bearing < 0) { bearing += 360; }
             
             if (Metric) {
                 dist /= 1000;
             } else {
                 dist /= 1852;
             }
+            
             dist = (Math.round((dist)*10)/10).toFixed(1);
             html += '<tr><td colspan="' + columns + '">Distance from Site: ' + dist +
-                (Metric ? ' km' : ' NM') + '</td></tr>';
+                (Metric ? ' km' : ' NM') + ' @ ' + bearing + '&deg;</td></tr>';
         } // End of SiteShow
 	} else {
 	    if (SiteShow) {
@@ -395,6 +473,7 @@ function refreshTableInfo() {
 	html += '<td onclick="setASC_DESC(\'1\');sortTable(\'tableinfo\',\'1\');">Flight</td>';
 	html += '<td onclick="setASC_DESC(\'2\');sortTable(\'tableinfo\',\'2\');" ' +
 	    'align="right">Squawk</td>';
+	// There is special sorting code for altitude (3) at sortTable()-function
 	html += '<td onclick="setASC_DESC(\'3\');sortTable(\'tableinfo\',\'3\');" ' +
 	    'align="right">Altitude</td>';
 	html += '<td onclick="setASC_DESC(\'4\');sortTable(\'tableinfo\',\'4\');" ' +
@@ -402,8 +481,10 @@ function refreshTableInfo() {
 	html += '<td onclick="setASC_DESC(\'5\');sortTable(\'tableinfo\',\'5\');" ' +
 	    'align="right">Track</td>';
 	html += '<td onclick="setASC_DESC(\'6\');sortTable(\'tableinfo\',\'6\');" ' +
-	    'align="right">Msgs</td>';
+	    'align="right">Signal</td>';
 	html += '<td onclick="setASC_DESC(\'7\');sortTable(\'tableinfo\',\'7\');" ' +
+	    'align="right">Msgs</td>';
+	html += '<td onclick="setASC_DESC(\'8\');sortTable(\'tableinfo\',\'8\');" ' +
 	    'align="right">Seen</td></thead><tbody>';
 	for (var tablep in Planes) {
 		var tableplane = Planes[tablep]
@@ -421,18 +502,22 @@ function refreshTableInfo() {
 			if (tableplane.squawk == 7600) {
 				specialStyle += " squawk7600";
 			}
-			// Emergancy
+			// Emergency
 			if (tableplane.squawk == 7700) {
 				specialStyle += " squawk7700";
 			}
 			
 			if (tableplane.vPosition == true) {
-				html += '<tr class="plane_table_row vPosition' + specialStyle + '">';
+				html += "\n" + '<tr onClick="onClickPlanes_table(\'' + tableplane.icao + '\');" class="plane_table_row vPosition' + specialStyle + '">';
 			} else {
-				html += '<tr class="plane_table_row ' + specialStyle + '">';
+				html += "\n" + '<tr onClick="onClickPlanes_table(\'' + tableplane.icao + '\');" class="plane_table_row ' + specialStyle + '">';
 		    }
 		    
-			html += '<td>' + tableplane.icao + '</td>';
+		    if (tableplane.reg && tableplane.reg != '')  {
+		        html += '<td>' + tableplane.reg + '</td>';
+		    } else {
+			    html += '<td>' + tableplane.icao + '</td>';
+			}
 			html += '<td>' + tableplane.flight + '</td>';
 			if (tableplane.squawk != '0000' ) {
     			html += '<td align="right">' + tableplane.squawk + '</td>';
@@ -441,10 +526,18 @@ function refreshTableInfo() {
     	    }
     	    
     	    if (Metric) {
-    			html += '<td align="right">' + Math.round(tableplane.altitude / 3.2828) + '</td>';
+    	        if (tableplane.vAltitude) {
+        			html += '<td align="right">' + Math.round(tableplane.altitude / 3.2828) + '</td>';
+        	    } else {
+    	            html += '<td align="right">&nbsp;</td>';
+    	        }
     			html += '<td align="right">' + Math.round(tableplane.speed * 1.852) + '</td>';
     	    } else {
-    	        html += '<td align="right">' + tableplane.altitude + '</td>';
+    	        if (tableplane.vAltitude) {
+    	            html += '<td align="right">' + tableplane.altitude + '</td>';
+    	        } else {
+    	            html += '<td align="right">&nbsp;</td>';
+    	        }
     	        html += '<td align="right">' + tableplane.speed + '</td>';
     	    }
 			
@@ -456,6 +549,17 @@ function refreshTableInfo() {
     	        html += '&nbsp;';
     	    }
     	    html += '</td>';
+    	    
+    	    var avgSignal = 0;
+    	    if (tableplane.signal) {
+        	    var sum = 0;
+                for(var i = 0; i < tableplane.signal.length; i++){
+                    sum += parseInt(tableplane.signal[i]);
+                }
+                avgSignal = Math.round(sum / tableplane.signal.length);
+            }
+            
+    	    html += '<td align="right">' + avgSignal + '</td>';
 			html += '<td align="right">' + tableplane.messages + '</td>';
 			html += '<td align="right">' + tableplane.seen + '</td>';
 			html += '</tr>';
@@ -471,17 +575,15 @@ function refreshTableInfo() {
         $('#SpecialSquawkWarning').css('display', 'none');
     }
 
-	// Click event for table
-	$('#planes_table').find('tr').click( function(){
-		var hex = $(this).find('td:first').text();
-		if (hex != "ICAO") {
-			selectPlaneByHex(hex);
-			refreshTableInfo();
-			refreshSelected();
-		}
-	});
-
 	sortTable("tableinfo");
+}
+
+function onClickPlanes_table (hex) {
+    if (hex && hex != '' && hex != "ICAO") {
+		selectPlaneByHex(hex);
+		refreshTableInfo();
+		refreshSelected();
+	}
 }
 
 // Credit goes to a co-worker that needed a similar functions for something else
@@ -518,7 +620,9 @@ function sortTable(szTableID,iCol) {
 
 	//determine if we are delaing with numerical, or alphanumeric content
 	var bNumeric = false;
-	if ((typeof oTbl.rows[0] !== 'undefined') &&
+	if (iSortCol == 3) { // Special sorting for Altitude-column
+	    bNumeric = true;
+	} else if ((typeof oTbl.rows[0] !== 'undefined') &&
 	    (!isNaN(parseFloat(oTbl.rows[0].cells[iSortCol].textContent ||
 	    oTbl.rows[0].cells[iSortCol].innerText)))) {
 	    bNumeric = true;
@@ -528,6 +632,9 @@ function sortTable(szTableID,iCol) {
 	for (var i=0,iLen=oTbl.rows.length;i<iLen;i++){
 		var oRow=oTbl.rows[i];
 		vColData=bNumeric?parseFloat(oRow.cells[iSortCol].textContent||oRow.cells[iSortCol].innerText):String(oRow.cells[iSortCol].textContent||oRow.cells[iSortCol].innerText);
+		
+		// Sort empty altitude as 0
+		if (iSortCol == 3 && (!vColData || vColData.length < 2)) {vColData = 0;}
 		aStore.push([vColData,oRow]);
 	}
 
@@ -595,9 +702,13 @@ function resetMap() {
 	if (SelectedPlane) {
 	    selectPlaneByHex(SelectedPlane);
 	}
+	
+	// Set reset METAR-flag
+	MetarReset = true;
 
 	refreshSelected();
 	refreshTableInfo();
+	getMetar();
 }
 
 function drawCircle(marker, distance) {
@@ -620,7 +731,108 @@ function drawCircle(marker, distance) {
       radius: distance, // In meters
       fillOpacity: 0.0,
       strokeWeight: 1,
+      clickable: false,
       strokeOpacity: 0.3
     });
     circle.bindTo('center', marker, 'position');
 }
+
+function drawAntennaData(marker) {
+    if (!AntennaDataShow) {
+        if (AntennaDataPath && typeof AntennaDataPath !== 'undefined') {
+            AntennaDataPath.setMap(null);
+            AntennaDataPath = null;
+        }
+        return false;
+    }    
+    
+    if (!marker && (SiteLat && SiteLon)) {
+        marker = new google.maps.LatLng(parseFloat(SiteLat), parseFloat(SiteLon));
+    }
+    
+    path = new Array();
+    for (var i=0;i<360;i++) {
+        if (typeof AntennaData[i] !== 'undefined') {
+            var metricDist = AntennaData[i] * 1.852;
+            path[i] = google.maps.geometry.spherical.computeOffset(marker, metricDist, i);
+        } else {
+            path[i] = marker;
+        }
+    }
+    
+    if (AntennaDataPath && typeof AntennaDataPath !== 'undefined') {
+        AntennaDataPath.setMap(null);
+        AntennaDataPath = null;
+    }
+    
+    AntennaDataPath = new google.maps.Polygon({
+        paths: path,
+        fillColor: '#7f7f7f',
+        fillOpacity: AntennaDataOpacity,
+        strokeColor: '#7f7f7f',
+        strokeWeight: 1,
+        strokeOpacity: AntennaDataOpacity,
+        clickable: false,
+        zIndex: -99998
+    });
+    AntennaDataPath.setMap(GoogleMap);
+}
+
+/** gets csv of requested airport ICAOs as parameter **/
+function getMetar(pMetarICAO) {
+    if (!pMetarICAO || typeof pMetarICAO === 'undefined') { // as parameter
+        if (!MetarIcaoCode || typeof MetarIcaoCode === 'undefined') { // from config.js
+            return; // No metar to show
+        } else {
+            pMetarICAO = MetarIcaoCode;
+        }
+    }
+    
+    pMetarICAO = pMetarICAO.replace(/\s/g, "");
+    url = 'http://weather.aero/dataserver_current/httpparam?dataSource=metars&' +
+            'requestType=retrieve&format=csv&hoursBeforeNow=1&fields=raw_text&' +
+            'mostRecentForEachStation=postfilter&stationString=' + pMetarICAO;
+            
+    xReader(url, function(data) {
+        if (data.status == Number(200)) {
+            csv = data.content.split("\n");
+            csv.splice(0,6);
+            html = "";
+            for(i=0;i<csv.length;i++) {
+                csv[i] = csv[i].replace(/,/g,"");
+                html += csv[i];
+                if (i < csv.length - 1) {
+                    html += "<br>";
+                }
+            }
+            document.getElementById('METAR').innerHTML = html;
+            if (MetarReset) {
+                $("#METAR").position({ my: "left bottom", at: "left+5 bottom-5", of: "#map_canvas" });
+                $("#METAR").draggable({ containment: "document" });
+                $("#METAR").addClass('ui-state-highlight');
+                $('#METAR').show();
+                MetarReset = false;
+            }
+        }
+    });
+}
+
+/* Store objects as string to localStorage */
+Storage.prototype.setObject = function(key, value) {
+    this.setItem(key, JSON.stringify(value));
+}
+
+/* Get string objets from localStorage */
+Storage.prototype.getObject = function(key) {
+    var value = this.getItem(key);
+    return value && JSON.parse(value);
+}
+
+/* Get size of object */
+Object.size = function(obj) {
+    var size = 0, key;
+    for (key in obj) {
+        if (obj.hasOwnProperty(key)) size++;
+    }
+    return size;
+};
