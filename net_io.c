@@ -598,11 +598,11 @@ char *aircraftsToJson(int *len) {
 
         // No metric conversion
         l = snprintf(p,buflen,
-            "{\"hex\":\"%06x\", \"squawk\":\"%04x\", \"flight\":\"%s\", \"lat\":%f, "
+            "{\"hex\":\"%06x\", \"regn\":\"%s\", \"type\":\"%s\", \"squawk\":\"%04x\", \"flight\":\"%s\", \"lat\":%f, "
             "\"lon\":%f, \"validposition\":%d, \"altitude\":%d, \"validaltitude\":%d, "
             "\"track\":%d, \"validtrack\":%d, \"signal\":%s, "
             "\"speed\":%d, \"messages\":%ld, \"seen\":%d, \"lastupdate\":%d},\n",
-            a->addr, a->modeA, a->flight, a->lat, a->lon, position, a->altitude, altitude,
+            a->addr, a->regn, a->type, a->modeA, a->flight, a->lat, a->lon, position, a->altitude, altitude,
             a->track, track, signalLevel, a->speed, a->messages, (int)(now - a->seen), (int)a->seen);
         p += l; buflen -= l;
         
