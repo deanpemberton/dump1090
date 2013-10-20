@@ -60,10 +60,6 @@ void populateairframeMySQL(struct aircraft *a) {
     
     MYSQL_RES *result = mysql_store_result(conn);
     
-    if (result == NULL)
-    {
-        finish_with_error(conn);
-    }
     int num_fields = mysql_num_fields(result);
     
     if ( !num_fields) {
