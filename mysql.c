@@ -67,12 +67,12 @@ void populateairframeMySQL(struct aircraft *a) {
     int num_fields = mysql_num_fields(result);
     
     if ( !num_fields) {
-         strncpy(a->regn, "UNKNOWN", sizeof("UNKNOWN"));
-        strncpy(a->type, "UNKNOWN", sizeof("UNKNOWN"));
+        a->regn = "UNKNOWN";
+        a->type = "UNKNOWN";
     } else {
         MYSQL_ROW row;
-        strncpy(a->regn, row[0], sizeof(row[0]));
-        strncpy(a->type, row[1], sizeof(row[0]));
+        a->regn = row[0];
+        a->type = row[1];
     }
     mysql_free_result(result);
     mysql_close(conn);
