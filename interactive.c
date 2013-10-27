@@ -59,11 +59,7 @@ struct aircraft *interactiveCreateAircraft(struct modesMessage *mm) {
     memset(a->signalLevel, mm->signalLevel, 8); // First time, initialise everything
                                                 // to the first signal strength
 
-// if we are using mysql then lookup the regn and type in the db
-    if (Modes.mysql)                  {populateairframeMySQL(a);}
-
-    
-    // mm->msgtype 32 is used to represent Mode A/C. These values can never change, so
+    // mm->msgtype 32 is used to represent Mode A/C. These values can never change, so 
     // set them once here during initialisation, and don't bother to set them every 
     // time this ModeA/C is received again in the future
     if (mm->msgtype == 32) {

@@ -190,8 +190,6 @@ struct client {
 struct aircraft {
     uint32_t      addr;           // ICAO address
     char          flight[16];     // Flight number
-    char          regn[16];     // Registration
-    char          type[16];     // Airframe Type
     unsigned char signalLevel[8]; // Last 8 Signal Amplitudes
     int           altitude;       // Altitude
     int           speed;          // Velocity

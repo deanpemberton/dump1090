@@ -28,7 +28,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 //  mysql.c
-//
+//  
 //
 //  Created by Dean Pemberton on 25/09/13.
 //
@@ -38,46 +38,6 @@
 //
 // ============================= Utility functions ==========================
 //
-
-
-void populateairframeMySQL(struct aircraft *a) {
-    MYSQL *conn;
-    conn = mysql_init(NULL);
-    mysql_real_connect(conn, "127.0.0.1", "pi", "raspberry", "dump1090", 0, NULL, 0);
-    
-    
-    if (conn == NULL)
-    {
-        fprintf(stderr, "mysql_init() failed\n");
-        exit(1);
-    }
-    
-    
-    snprintf(p, 999, "SELECT regn,type from airframe WHERE icao = '%02X'",
-             a->addr);
-    
-    mysql_query(conn, p);
-    
-    MYSQL_RES *result = mysql_store_result(conn);
-    
-    if (result == NULL)
-    {
-        finish_with_error(conn);
-    }
-    int num_fields = mysql_num_fields(result);
-    
-    if ( !num_fields) {
-        a->regn = "UNKNOWN";
-        a->type = "UNKNOWN";
-    } else {
-        MYSQL_ROW row;
-        a->regn = row[0];
-        a->type = row[1];
-    }
-    mysql_free_result(result);
-    mysql_close(conn);
-    
-}
 
 
 /* Write aircraft data to a MySQL Database */
