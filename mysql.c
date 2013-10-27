@@ -45,7 +45,6 @@ void populateairframeMySQL(struct aircraft *a) {
     conn = mysql_init(NULL);
     mysql_real_connect(conn, "127.0.0.1", "pi", "raspberry", "dump1090", 0, NULL, 0);
     
-    char msgFlights[1000], *p = msgFlights;
     
     if (conn == NULL)
     {
